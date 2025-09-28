@@ -52,7 +52,11 @@ print("after scaling minimum", X_scaled.min(axis=0))
 
 
 from sklearn.decomposition import PCA
-pca=PCA(n_components=3)  # Changed back to 3 to access third component
+
+# Configuration: Change this number to use different amounts of components
+N_COMPONENTS = 4
+
+pca=PCA(n_components=N_COMPONENTS)
 pca.fit(X_scaled)
 X_pca=pca.transform(X_scaled)
 #let's check the shape of X_pca array
@@ -89,7 +93,7 @@ plt.show()
 
 
 plt.matshow(pca.components_,cmap='viridis')
-plt.yticks([0,1],['1st Comp','2nd Comp'],fontsize=10)  # Updated to show only 2 components
+plt.yticks(range(N_COMPONENTS),[f'{i+1}st Comp' if i==0 else f'{i+1}nd Comp' if i==1 else f'{i+1}rd Comp' for i in range(N_COMPONENTS)],fontsize=10)
 plt.colorbar()
 plt.xticks(range(len(cancer.feature_names)),cancer.feature_names,rotation=65,ha='left')
 plt.tight_layout()
@@ -107,67 +111,50 @@ s.set_xticklabels(s.get_xticklabels(),rotation=30,fontsize=7)
 plt.show()
 
 
-# Create comparison plots: PC1 vs PC2, PC1 vs PC3, PC2 vs PC3
+# Create comparison plots for all component pairs
 labels=cancer.target
 cdict={0:'red',1:'green'}
 labl={0:'Malignant',1:'Benign'}
 marker={0:'*',1:'o'}
 alpha={0:.3, 1:.5}
 
-# Create a figure with 3 subplots
-fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+# Create subplots for all possible pairs
+n_pairs = N_COMPONENTS * (N_COMPONENTS - 1) // 2
+fig, axes = plt.subplots(1, n_pairs, figsize=(6*n_pairs, 5))
+if n_pairs == 1:
+    axes = [axes]  # Make it iterable for single subplot
 fig.patch.set_facecolor('white')
 
-# Plot 1: PC1 vs PC2
-ax1 = axes[0]
-for l in np.unique(labels):
-    ix=np.where(labels==l)
-    ax1.scatter(X_pca[ix,0], X_pca[ix,1], c=cdict[l], s=40, label=labl[l], 
-                marker=marker[l], alpha=alpha[l])
-ax1.set_xlabel("First Principal Component", fontsize=12)
-ax1.set_ylabel("Second Principal Component", fontsize=12)
-ax1.set_title("PC1 vs PC2", fontsize=14)
-ax1.legend()
-
-# Plot 2: PC1 vs PC3
-ax2 = axes[1]
-for l in np.unique(labels):
-    ix=np.where(labels==l)
-    ax2.scatter(X_pca[ix,0], X_pca[ix,2], c=cdict[l], s=40, label=labl[l], 
-                marker=marker[l], alpha=alpha[l])
-ax2.set_xlabel("First Principal Component", fontsize=12)
-ax2.set_ylabel("Third Principal Component", fontsize=12)
-ax2.set_title("PC1 vs PC3", fontsize=14)
-ax2.legend()
-
-# Plot 3: PC2 vs PC3
-ax3 = axes[2]
-for l in np.unique(labels):
-    ix=np.where(labels==l)
-    ax3.scatter(X_pca[ix,1], X_pca[ix,2], c=cdict[l], s=40, label=labl[l], 
-                marker=marker[l], alpha=alpha[l])
-ax3.set_xlabel("Second Principal Component", fontsize=12)
-ax3.set_ylabel("Third Principal Component", fontsize=12)
-ax3.set_title("PC2 vs PC3", fontsize=14)
-ax3.legend()
+plot_idx = 0
+for i in range(N_COMPONENTS):
+    for j in range(i+1, N_COMPONENTS):
+        ax = axes[plot_idx]
+        for l in np.unique(labels):
+            ix=np.where(labels==l)
+            ax.scatter(X_pca[ix,i], X_pca[ix,j], c=cdict[l], s=40, label=labl[l], 
+                      marker=marker[l], alpha=alpha[l])
+        ax.set_xlabel(f"Principal Component {i+1}", fontsize=12)
+        ax.set_ylabel(f"Principal Component {j+1}", fontsize=12)
+        ax.set_title(f"PC{i+1} vs PC{j+1}", fontsize=14)
+        ax.legend()
+        plot_idx += 1
 
 plt.tight_layout()
 plt.show()
 
 # Calculate and display explained variance ratios
 print("Explained variance ratios:")
-print(f"PC1: {pca.explained_variance_ratio_[0]:.4f}")
-print(f"PC2: {pca.explained_variance_ratio_[1]:.4f}")
-print(f"PC3: {pca.explained_variance_ratio_[2]:.4f}")
-print(f"Total variance explained by first 3 components: {np.sum(pca.explained_variance_ratio_[:3]):.4f}")
+for i in range(N_COMPONENTS):
+    print(f"PC{i+1}: {pca.explained_variance_ratio_[i]:.4f}")
+print(f"Total variance explained by first {N_COMPONENTS} components: {np.sum(pca.explained_variance_ratio_[:N_COMPONENTS]):.4f}")
 
 # Calculate separation metrics for each pair
 from sklearn.metrics import silhouette_score
 
 print("\nSeparation Analysis:")
-print(f"PC1 vs PC2 - Silhouette Score: {silhouette_score(X_pca[:, [0,1]], labels):.4f}")
-print(f"PC1 vs PC3 - Silhouette Score: {silhouette_score(X_pca[:, [0,2]], labels):.4f}")
-print(f"PC2 vs PC3 - Silhouette Score: {silhouette_score(X_pca[:, [1,2]], labels):.4f}")
+for i in range(N_COMPONENTS):
+    for j in range(i+1, N_COMPONENTS):
+        print(f"PC{i+1} vs PC{j+1} - Silhouette Score: {silhouette_score(X_pca[:, [i,j]], labels):.4f}")
 
 # Calculate within-class and between-class distances for each pair
 def calculate_separation_ratio(data, labels):
@@ -182,6 +169,6 @@ def calculate_separation_ratio(data, labels):
     return separation_ratio
 
 print(f"\nSeparation Ratios (higher is better):")
-print(f"PC1 vs PC2: {calculate_separation_ratio(X_pca[:, [0,1]], labels):.4f}")
-print(f"PC1 vs PC3: {calculate_separation_ratio(X_pca[:, [0,2]], labels):.4f}")
-print(f"PC2 vs PC3: {calculate_separation_ratio(X_pca[:, [1,2]], labels):.4f}")
+for i in range(N_COMPONENTS):
+    for j in range(i+1, N_COMPONENTS):
+        print(f"PC{i+1} vs PC{j+1}: {calculate_separation_ratio(X_pca[:, [i,j]], labels):.4f}")
